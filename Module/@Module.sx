@@ -1,0 +1,15 @@
+public use GFX.ECS.Commands.Commands
+public use GFX.ECS.Entity.Entity
+public use GFX.ECS.EntityRecipe.EntityRecipe
+public use GFX.ECS.Plugin.Plugin
+public use GFX.ECS.Query.Query
+public use GFX.ECS.World.World
+
+contribute GFX.Plugins {
+    public use GFX.ECS.Plugin as ECS
+}
+
+contribute GFX.Resources {
+    public use GFX.ECS.Commands as Commands
+    public use GFX.ECS.World as World
+}

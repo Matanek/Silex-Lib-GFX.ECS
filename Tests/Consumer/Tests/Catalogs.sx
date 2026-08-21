@@ -1,0 +1,24 @@
+use GFX.Application
+use GFX.ECS
+use GFX.Plugins
+use GFX.Resources
+
+struct Health { var value:int }
+
+func injected(world:&Resources.World, commands:&Resources.Commands) {}
+
+test "consume ECS directly and through the GFX catalogs" {
+    var world = ECS.World()
+    let entity = world.spawn(ECS.EntityRecipe()..with(Health(value:100)))
+    world.update<Health>(entity, func(health:&Health) { health.value -= 10 })
+
+    let plugin = Plugins.ECS()
+    var application = Application()..add_plugin(plugin)
+    application.prepare()
+    var resources = application.resources()
+
+    assert(world.get<Health>(entity).value == 90)
+    assert(plugin.id() == "GFX.ECS.Plugin")
+    assert(resources.has<Resources.World>())
+    assert(resources.has<Resources.Commands>())
+}
