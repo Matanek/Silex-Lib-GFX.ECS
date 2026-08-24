@@ -1,5 +1,6 @@
 use GFX.ECS.Archetype.Archetype
 use GFX.ECS.ComponentStore.ComponentStore
+use GFX.ECS.ComponentPool.ComponentPool
 use GFX.ECS.Entity.Entity
 use GFX.ECS.EntityRecipe.EntityRecipe
 use GFX.ECS.Record.Record
@@ -157,9 +158,25 @@ public class World {
         var value = self.archetypes[archetype]
         return value.count()
     }
+    module func query_range_start(base:int, count:int, range_start:int) int {
+        if range_start <= base { return 0 }
+        let offset = range_start - base
+        if offset > count { return count }
+        return offset
+    }
+    module func query_range_end(base:int, count:int, range_end:int) int {
+        if range_end < 0 { return count }
+        if range_end <= base { return 0 }
+        let offset = range_end - base
+        if offset > count { return count }
+        return offset
+    }
     package func query_entity(archetype:int, row:int) Entity {
         var value = self.archetypes[archetype]
         return value.entity(row)
+    }
+    module func query_pool<T>() @self:ComponentPool<T> {
+        return self.components.query_pool<T>()
     }
     package func query_get<T>(entity:Entity) @self:T {
         return self.components.get_known<T>(entity)

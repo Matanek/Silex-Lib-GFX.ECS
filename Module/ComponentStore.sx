@@ -60,6 +60,10 @@ struct ComponentStore {
         return pool.get_known(entity)
     }
 
+    module func query_pool<T>() @self:ComponentPool<T> {
+        return self.resources.get<ComponentPool<T>>()
+    }
+
     // Lowered by the compiler so a reference can retain ComponentStore
     // provenance across the typed Resources slot and dense pool.
     func get_mut<T>(entity:Entity) &self:T {

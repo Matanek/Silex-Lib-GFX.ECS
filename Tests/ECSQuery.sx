@@ -201,6 +201,42 @@ test "readonly queries retrieve dense components after pool compaction" {
     assert(probe.checksum == 68)
 }
 
+struct Missing { let value:int }
+
+class MissingQueryProbe {
+    var count:int
+
+    init() { self.count = 0 }
+}
+
+func inspect_missing_query(
+    query:ECS.Query<(ECS.Entity, @Missing)>,
+    probe:&MissingQueryProbe
+) {
+    for (entity, missing) in query {
+        if entity.is_valid() && missing.value == 1 { probe.count++ }
+    }
+}
+
+test "readonly query skips a component type with no allocated pool" {
+    var probe = MissingQueryProbe()
+    var application = Application()
+        ..add_plugin(ECS.Plugin())
+        ..add_system(Schedule.update, inspect_missing_query)
+        ..with_runner(run_query_once)
+    application.prepare()
+
+    if true {
+        var resources = application.resources()
+        resources.insert(probe)
+        var world:&ECS.World = resources.get_mut<ECS.World>()
+        world.spawn(ECS.EntityRecipe()..with(Position(x:12)))
+    }
+
+    application.run()
+    assert(probe.count == 0)
+}
+
 class QueryLifetimeProbe {
     var entity_count:int
 
