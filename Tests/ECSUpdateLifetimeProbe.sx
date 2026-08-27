@@ -1,0 +1,25 @@
+use GFX.ECS
+
+class Payload {
+    let text:str
+    init(text:str) { self.text = text }
+}
+
+struct Value { var current:int; var payload:Payload }
+
+func main() {
+    var world = ECS.World()
+    let entity = world.spawn(ECS.EntityRecipe()..with(Value(
+        current:0,
+        payload:Payload("0")
+    )))
+    var index = 0
+    while index < 100_000 {
+        world.update<Value>(entity, func(value:&Value) {
+            value.current = index
+            value.payload = Payload("value $(index)")
+        })
+        index++
+    }
+    print(world.get<Value>(entity).current)
+}
