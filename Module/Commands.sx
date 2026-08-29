@@ -64,7 +64,7 @@ public class Commands {
     private var interval_order:int
     private var next_sequence:int
 
-    module init() {
+    init() {
         self.pending = []
         self.parent_address = 0
         self.system_order = -1
@@ -110,7 +110,7 @@ public class Commands {
         self.append(Command.structural(RemoveCommand<T>(entity)))
     }
 
-    module func flush(world:&World) {
+    func flush(world:&World) {
         if self.parent_address != 0 {
             var root = C.object_from_address<Commands>(self.parent_address)
             root.flush(world)

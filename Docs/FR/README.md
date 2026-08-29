@@ -43,6 +43,12 @@ modifie. `ECS.Commands` diffère les changements structurels — création,
 destruction, ajout ou retrait de composants — afin qu’une itération active
 reste stable.
 
+Un contexte qui possède directement son `World` peut aussi construire
+`ECS.Commands`, enregistrer ses changements puis appeler `flush(world)` à la
+frontière qu’il contrôle. Cette opération applique uniquement la file courante
+et la vide ; le plugin Application conserve ce travail automatique pour le
+contexte global.
+
 ## Intégrer une application GFX
 
 `ECS.Plugin` installe le monde, les commandes différées et l’intégration des

@@ -12,6 +12,15 @@ test "consume ECS directly and through the GFX catalogs" {
     let entity = world.spawn(ECS.EntityRecipe()..with(Health(value:100)))
     world.update<Health>(entity, func(health:&Health) { health.value -= 10 })
 
+    var deferred_world = ECS.World()
+    var commands = ECS.Commands()
+    commands.spawn(ECS.EntityRecipe()..with(Health(value:42)))
+    assert(deferred_world.entities().count() == 0)
+    commands.flush(deferred_world)
+    let deferred_entities = deferred_world.entities()
+    assert(deferred_entities.count() == 1)
+    assert(deferred_world.get<Health>(deferred_entities[0]).value == 42)
+
     let plugin = Plugins.ECS()
     var application = Application()..add_plugin(plugin)
     application.prepare()

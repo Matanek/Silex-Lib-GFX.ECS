@@ -42,6 +42,11 @@ An `ECS.Query` exposes the components it reads and changes in its signature.
 `ECS.Commands` defers structural changes — creating or destroying entities and
 adding or removing components — so an active iteration remains stable.
 
+A context that directly owns its `World` may also construct `ECS.Commands`,
+record changes, and call `flush(world)` at its chosen boundary. This applies
+and clears only the current queue; the Application plugin keeps doing that
+automatically for the global context.
+
 ## Integrate a GFX application
 
 `ECS.Plugin` installs the world, deferred commands, and system integration into
