@@ -1,6 +1,6 @@
 {
   "name": "GFX.ECS",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": {
     "en": "Stable entities, typed components, queries, spawn recipes, and deferred commands.",
     "fr": "Entités stables, composants typés, requêtes, recettes de création et commandes différées."
