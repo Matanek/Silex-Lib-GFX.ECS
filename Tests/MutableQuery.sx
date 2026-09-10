@@ -1,0 +1,126 @@
+use GFX.Application
+use GFX.Application.Schedule
+use GFX.ECS
+
+struct Payload { var numbers:int[]; var label:str }
+struct Counter { var value:int }
+struct Extra { let value:int }
+struct Missing { var value:int }
+
+class Probe {
+    var visits:int = 0
+    var previous:int[] = []
+}
+
+func mutate(query:ECS.Query<(ECS.Entity, &Payload, &Counter)>, probe:&Probe) {
+    for (entity, payload, counter) in query {
+        assert(entity.is_valid())
+        probe.visits++
+        counter.value += 1
+        payload.numbers[0] += counter.value
+        payload.numbers.append(counter.value)
+        payload.label += "!"
+    }
+}
+
+func missing(query:ECS.Query<(ECS.Entity, &Missing)>) {
+    for (entity, value) in query { panic("unallocated component pool matched") }
+}
+
+func run_twice(application:Application) int {
+    application.run_schedule(Schedule.update)
+    application.run_schedule(Schedule.update)
+    return 0
+}
+
+test "mutable queries preserve dense identity and owned fields across archetypes and generations" {
+    var probe = Probe()
+    probe.previous = [10]
+    var application = Application()
+        ..add_plugin(ECS.Plugin())
+        ..add_system(Schedule.update, mutate)
+        ..add_system(Schedule.update, missing)
+        ..with_runner(run_twice)
+    application.prepare()
+    var entities:ECS.Entity[] = []
+    var excluded = ECS.Entity()
+    if true {
+        var resources = application.resources()
+        resources.insert(probe)
+        var world:&ECS.World = resources.get_mut<ECS.World>()
+        let removed = world.spawn(ECS.EntityRecipe()
+            ..with(Payload(numbers:[999], label:"removed"))
+            ..with(Counter(value:99)))
+        entities.append(world.spawn(ECS.EntityRecipe()
+            ..with(Payload(numbers:probe.previous, label:"first"))
+            ..with(Counter(value:0))))
+        entities.append(world.spawn(ECS.EntityRecipe()
+            ..with(Payload(numbers:[20], label:"second"))
+            ..with(Counter(value:0))
+            ..with(Extra(value:1))))
+        excluded = world.spawn(ECS.EntityRecipe()..with(Payload(numbers:[77], label:"excluded")))
+        world.destroy(removed)
+        let reused = world.spawn(ECS.EntityRecipe()
+            ..with(Payload(numbers:[30], label:"third"))
+            ..with(Counter(value:0)))
+        assert(reused.index == removed.index)
+        assert(reused.generation > removed.generation)
+        entities.append(reused)
+    }
+    assert(application.run() == 0)
+    assert(probe.visits == 6)
+    assert(probe.previous.count() == 1)
+    assert(probe.previous[0] == 10)
+    var resources = application.resources()
+    let world:@ECS.World = resources.get<ECS.World>()
+    var index = 0
+    for entity in entities {
+        let payload = world.get<Payload>(entity)
+        assert(payload.numbers.count() == 3)
+        assert(payload.numbers[0] == (index + 1) * 10 + 3)
+        assert(payload.numbers[1] == 1 && payload.numbers[2] == 2)
+        assert(world.get<Counter>(entity).value == 2)
+        index++
+    }
+    assert(world.get<Payload>(entities[0]).label == "first!!")
+    assert(world.get<Payload>(entities[1]).label == "second!!")
+    assert(world.get<Payload>(entities[2]).label == "third!!")
+    assert(world.get<Payload>(excluded).numbers[0] == 77)
+}
+
+func with_control_flow(query:ECS.Query<(ECS.Entity, &Counter)>, probe:&Probe) {
+    for (entity, counter) in query {
+        if counter.value == 0 { continue }
+        counter.value += 10
+        probe.visits++
+        break
+    }
+    for (entity, counter) in query {
+        counter.value += 1
+    }
+}
+
+test "mutable pool references survive continue break and repeated iteration" {
+    var probe = Probe()
+    var application = Application()
+        ..add_plugin(ECS.Plugin())
+        ..add_system(Schedule.update, with_control_flow)
+        ..with_runner(run_twice)
+    application.prepare()
+    var entities:ECS.Entity[] = []
+    if true {
+        var resources = application.resources()
+        resources.insert(probe)
+        var world:&ECS.World = resources.get_mut<ECS.World>()
+        for index in 0...3 {
+            entities.append(world.spawn(ECS.EntityRecipe()..with(Counter(value:index))))
+        }
+    }
+    assert(application.run() == 0)
+    assert(probe.visits == 2)
+    var resources = application.resources()
+    let world:@ECS.World = resources.get<ECS.World>()
+    assert(world.get<Counter>(entities[0]).value == 12)
+    assert(world.get<Counter>(entities[1]).value == 13)
+    assert(world.get<Counter>(entities[2]).value == 4)
+}
