@@ -36,6 +36,23 @@ The returned identifier remains stable until the entity is destroyed.
 `World.update` makes the modified type explicit and limits the mutable borrow
 to the provided function.
 
+## Temporarily disable an entity
+
+`world.enable(entity, false)` preserves the entity identity and components,
+but excludes it from every `ECS.Query` and from `world.entities()`. The entity
+remains alive: `is_alive`, `has`, `get`, `update`, `insert`, `remove` and
+`destroy` stay available. Editing its components does not enable it again.
+`world.enable(entity, true)` returns it to queries with the same identifier.
+
+`world.is_enabled(entity)` reads its state; a destroyed entity returns `false`.
+`world.entities(include_disabled:true)` inspects all living entities. Newly
+spawned entities are enabled by default.
+
+Activation is a structural change: do not change it directly during query
+iteration. Use `commands.enable(entity, state)` in a system to apply it at the
+usual command flush point, in the same deterministic order as other commands.
+A command targeting an already destroyed entity is ignored.
+
 ## Query and defer changes
 
 An `ECS.Query` exposes the components it reads and changes in its signature.

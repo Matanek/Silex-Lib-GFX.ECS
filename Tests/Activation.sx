@@ -1,0 +1,105 @@
+use GFX.Application
+use GFX.ECS
+
+struct Value { var ticks:int = 0 }
+struct Extra { var value:int = 42 }
+struct Count { var value:int = 0 }
+
+func advance(query:ECS.Query<(ECS.Entity, &Value)>) {
+    for (_, value) in query { value.ticks++ }
+}
+
+func count_entities(count:&Count, query:ECS.Query<(ECS.Entity, @Value)>) {
+    count.value = 0
+    for (entity, value) in query { count.value++ }
+}
+
+func disable_after_processing(commands:&ECS.Commands, query:ECS.Query<(ECS.Entity, @Value)>) {
+    for (entity, _) in query { commands.enable(entity, false) }
+}
+
+test "inactive entities retain editable components identity and generation" {
+    var world = ECS.World()
+    let entity = world.spawn(ECS.EntityRecipe()..with(Value()))
+    world.enable(entity, false)
+    world.enable(entity, false)
+    assert(world.is_alive(entity) && !world.is_enabled(entity))
+    assert(world.entities().is_empty())
+    assert(world.entities(include_disabled:true).count() == 1)
+    world.insert(entity, Extra())
+    world.update<Value>(entity, func(value:&Value) { value.ticks = 7 })
+    world.remove<Extra>(entity)
+    assert(!world.is_enabled(entity) && world.get<Value>(entity).ticks == 7)
+    world.enable(entity, true)
+    assert(world.entities()[0] == entity)
+    world.enable(entity, false)
+    world.destroy(entity)
+    let replacement = world.spawn(ECS.EntityRecipe()..with(Value()))
+    assert(world.is_enabled(replacement) && !world.is_enabled(entity))
+    assert(replacement.index == entity.index && replacement.generation != entity.generation)
+}
+
+test "serial and partitioned queries skip inactive archetypes and resume once" {
+    for workers in [1, 4] {
+        var application = Application(workers)
+            ..add_plugin(ECS.Plugin())
+            ..add_resource(Count())
+            ..add_system(Application.Schedule.update, advance)
+            ..add_system(Application.Schedule.render, count_entities)
+        application.prepare()
+        var entities:ECS.Entity[] = []
+        {
+            var resources = application.resources()
+            var world = resources.get_mut<ECS.World>()
+            for index in 0...513 {
+                let entity = world.spawn(ECS.EntityRecipe()..with(Value()))
+                entities.append(entity)
+                if index % 2 == 0 { world.enable(entity, false) }
+                if index % 3 == 0 { world.insert(entity, Extra()) }
+            }
+        }
+        application.run_schedule(Application.Schedule.update)
+        application.run_schedule(Application.Schedule.render)
+        assert(application.resources().get<Count>().value == 256)
+        {
+            var resources = application.resources()
+            var world = resources.get_mut<ECS.World>()
+            var index = 0
+            for entity in entities {
+                if index % 2 == 0 { assert(world.get<Value>(entity).ticks == 0) }
+                else { assert(world.get<Value>(entity).ticks == 1) }
+                world.enable(entity, true)
+                index++
+            }
+        }
+        application.run_schedule(Application.Schedule.update)
+        application.run_schedule(Application.Schedule.render)
+        assert(application.resources().get<Count>().value == 513)
+        var world = application.resources().get<ECS.World>()
+        var index = 0
+        for entity in entities {
+            if index % 2 == 0 { assert(world.get<Value>(entity).ticks == 1) }
+            else { assert(world.get<Value>(entity).ticks == 2) }
+            index++
+        }
+        application.run_schedule(Application.Schedule.shutdown)
+    }
+}
+
+test "commands defer activation changes until after query iteration" {
+    var application = Application(4)
+        ..add_plugin(ECS.Plugin())
+        ..add_system(Application.Schedule.update, disable_after_processing)
+    application.prepare()
+    {
+        var resources = application.resources()
+        var world = resources.get_mut<ECS.World>()
+        for _ in 0...257 { world.spawn(ECS.EntityRecipe()..with(Value())) }
+    }
+    application.run_schedule(Application.Schedule.update)
+    application.run_schedule(Application.Schedule.post_update)
+    var world = application.resources().get<ECS.World>()
+    assert(world.entities().is_empty())
+    assert(world.entities(include_disabled:true).count() == 257)
+    application.run_schedule(Application.Schedule.shutdown)
+}

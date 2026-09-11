@@ -36,6 +36,24 @@ L’identifiant renvoyé reste stable jusqu’à la destruction de l’entité.
 `World.update` rend explicite le type modifié et limite l’emprunt mutable à la
 fonction fournie.
 
+## Désactiver temporairement une entité
+
+`world.enable(entity, false)` conserve l’identité et les composants de l’entité,
+mais l’exclut de toutes les `ECS.Query` et de `world.entities()`. Elle reste
+vivante : `is_alive`, `has`, `get`, `update`, `insert`, `remove` et `destroy`
+restent disponibles. Modifier ses composants ne la réactive pas.
+`world.enable(entity, true)` la réintègre aux requêtes avec le même identifiant.
+
+`world.is_enabled(entity)` lit son état ; une entité détruite renvoie `false`.
+`world.entities(include_disabled:true)` permet d’inspecter toutes les entités
+vivantes. Les nouvelles entités sont actives par défaut.
+
+L’activation est une modification structurelle : ne pas l’effectuer directement
+pendant une itération de query. Utiliser `commands.enable(entity, state)` dans
+un système pour l’appliquer au point de vidage habituel des commandes, dans le
+même ordre déterministe que les autres commandes. Une commande visant une
+entité déjà détruite est ignorée.
+
 ## Interroger et différer les changements
 
 Une `ECS.Query` rend visibles dans sa signature les composants qu’elle lit et

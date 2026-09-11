@@ -45,10 +45,27 @@ public class World {
         return record.is_alive() && record.generation() == entity.generation
     }
 
-    func entities() Entity[] {
+    // Inactive entities retain their identity and components, but leave queries.
+    func enable(entity:Entity, state:bool) {
+        let location = self.require(entity).location()
+        var source = self.archetypes[location.archetype]
+        if source.is_enabled() == state { return }
+        let signature = source.components()
+        self.detach(entity, location.archetype, location.row)
+        self.place(entity, signature, state)
+    }
+
+    func is_enabled(entity:Entity) bool {
+        if !self.is_alive(entity) { return false }
+        let location = self.require(entity).location()
+        return self.archetypes[location.archetype].is_enabled()
+    }
+
+    func entities(include_disabled:bool = false) Entity[] {
         var result:Entity[] = []
         var archetypes = self.archetypes
         for var archetype in archetypes {
+            if !include_disabled && !archetype.is_enabled() { continue }
             for entity in archetype_entities(archetype) { result.append(entity) }
         }
         return result
@@ -152,10 +169,11 @@ public class World {
         let component = self.components.type_id<T>()
         if component < 0 { return false }
         var value = self.archetypes[archetype]
-        return value.has(component)
+        return value.is_enabled() && value.has(component)
     }
     package func query_entity_count(archetype:int) int {
         var value = self.archetypes[archetype]
+        if !value.is_enabled() { return 0 }
         return value.count()
     }
     module func query_range_start(base:int, count:int, range_start:int) int {
@@ -203,8 +221,8 @@ public class World {
         return self.records[entity.index]
     }
 
-    private func place(entity:Entity, signature:int[]) {
-        let archetype = self.find_or_create_archetype(signature)
+    private func place(entity:Entity, signature:int[], enabled:bool = true) {
+        let archetype = self.find_or_create_archetype(signature, enabled)
         var target = self.archetypes[archetype]
         let row = target.append(entity)
         var record = self.records[entity.index]
@@ -212,8 +230,9 @@ public class World {
     }
 
     private func move_to(entity:Entity, archetype:int, row:int, signature:int[]) {
+        let enabled = self.archetypes[archetype].is_enabled()
         self.detach(entity, archetype, row)
-        self.place(entity, signature)
+        self.place(entity, signature, enabled)
     }
 
     private func detach(entity:Entity, archetype:int, row:int) {
@@ -225,13 +244,13 @@ public class World {
         }
     }
 
-    private func find_or_create_archetype(signature:int[]) int {
+    private func find_or_create_archetype(signature:int[], enabled:bool) int {
         var index = 0
         while index < self.archetypes.count() {
-            if self.archetypes[index].is_exact(signature) { return index }
+            if self.archetypes[index].is_exact(signature, enabled) { return index }
             index++
         }
-        self.archetypes.append(Archetype(signature))
+        self.archetypes.append(Archetype(signature, enabled))
         return self.archetypes.count() - 1
     }
 }

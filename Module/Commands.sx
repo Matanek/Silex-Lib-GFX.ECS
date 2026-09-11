@@ -16,6 +16,7 @@ struct EmptyStructuralCommand:StructuralCommand {
 enum Command {
     spawn(EntityRecipe)
     destroy(Entity)
+    enable(Entity, bool)
     structural(StructuralCommand)
 }
 
@@ -102,6 +103,10 @@ public class Commands {
         self.append(Command.destroy(entity))
     }
 
+    func enable(entity:Entity, state:bool) {
+        self.append(Command.enable(entity, state))
+    }
+
     func insert<T>(entity:Entity, component:T) {
         self.append(Command.structural(InsertCommand<T>(entity, component)))
     }
@@ -123,6 +128,7 @@ public class Commands {
             match entry.command {
                 spawn(recipe) => { world.spawn(recipe) }
                 destroy(entity) => { if world.is_alive(entity) { world.destroy(entity) } }
+                enable(entity, state) => { if world.is_alive(entity) { world.enable(entity, state) } }
                 structural(var change) => { change.apply(world) }
             }
         }

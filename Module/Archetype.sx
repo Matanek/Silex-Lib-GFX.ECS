@@ -2,14 +2,19 @@ use GFX.ECS.Entity.Entity
 
 class Archetype {
     private let signature:int[]
+    private let enabled:bool
     private var members:Entity[]
 
-    init(signature:int[]) {
+    init(signature:int[], enabled:bool = true) {
+        self.enabled = enabled
         self.signature = signature
         self.members = []
     }
 
-    func is_exact(signature:@int[]) bool {
+    func is_enabled() bool { return self.enabled }
+
+    func is_exact(signature:@int[], enabled:bool = true) bool {
+        if self.enabled != enabled { return false }
         if self.signature.count() != signature.count() { return false }
         var index = 0
         while index < signature.count() {
@@ -20,6 +25,7 @@ class Archetype {
     }
 
     func matches(required:@int[]) bool {
+        if !self.enabled { return false }
         for expected in required {
             var present = false
             for available in self.signature {
