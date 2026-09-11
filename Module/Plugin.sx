@@ -10,7 +10,7 @@ public struct Plugin:PluginProtocol {
     func build(application:&Application) {
         application.add_resource(World())
         application.add_resource(Commands())
-        application.add_after_system(Schedule.post_update, flush_commands)
+        application.add_after_system(Schedule.post_update, flush_commands, process_mode:GFX.Application.ProcessMode.always)
         application.add_after_system(Schedule.shutdown, stop_ecs)
     }
 }
